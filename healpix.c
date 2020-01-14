@@ -190,10 +190,18 @@ double conv_theta(double x)
 	return y;
 }
 
+// According to the comments present in the `healpix_bare` source code, 
+// the phi angle works best when -2pi < phi < 2pi. On the other hand, 
+// `chealpix` works with `0 < phi < 2pi` and that is how the original
+// tests worked. Thus, it needed to be patched.
+static double conv_phi(double x) {
+	return fmod(PID + fmod(x, PID), PID);
+}
+
 hpint64 healpix_nest_c(int32 order, SPoint* p)
 {
 	hpint64 i;
-	t_ang angle = { conv_theta(p->lat), p->lng };
+	t_ang angle = { conv_theta(p->lat), conv_phi(p->lng) };
 	i = ang2nest(c_nside(order), angle);
 	return i;
 }
@@ -210,7 +218,7 @@ Datum healpix_ring(PG_FUNCTION_ARGS)
 {
 	int32 order = PG_GETARG_INT32(0);
 	SPoint* p = (SPoint*) PG_GETARG_POINTER(1);
-	t_ang angle = { conv_theta(p->lat), p->lng };
+	t_ang angle = { conv_theta(p->lat), conv_phi(p->lng) };
 	check_order(order);
 	PG_RETURN_INT64(ang2ring(c_nside(order), angle));
 }
@@ -224,7 +232,7 @@ Datum inv_healpix_nest(PG_FUNCTION_ARGS)
 	check_index(order, i);
 	angle = nest2ang(c_nside(order), i);
 	p->lat = conv_theta(angle.theta);
-	p->lng = angle.phi;
+	p->lng = conv_phi(angle.phi);
 	PG_RETURN_POINTER(p);
 }
 
@@ -237,6 +245,6 @@ Datum inv_healpix_ring(PG_FUNCTION_ARGS)
 	check_index(order, i);
 	angle = ring2ang(c_nside(order), i);
 	p->lat = conv_theta(angle.theta);
-	p->lng = angle.phi;
+	p->lng = conv_phi(angle.phi);
 	PG_RETURN_POINTER(p);
 }
